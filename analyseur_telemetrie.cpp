@@ -52,7 +52,7 @@ struct DonneesAxe {
     uint16_t courant;   
 };
 
-struct Trame {
+struct __attribute__((packed)) Trame { //J'ai fait des recherche google aucun AI
     uint8_t SYNC_1;
     uint8_t SYNC_2;
     uint8_t SEQ;
@@ -165,7 +165,11 @@ bool decoder_trame(const uint8_t* buffer, Trame& trame) {
     //
     // Si vos structures sont bien définies et alignées, un simple
     // transtypage peut suffire.
-    trame
+    Trame* t = (Trame*)buffer;
+    trame = *t;
+    if (trame_valide(t)){
+        return true;
+    }
 
     return false;
 }
@@ -182,7 +186,12 @@ bool decoder_trame(const uint8_t* buffer, Trame& trame) {
  */
 bool est_en_alerte(const DonneesAxe& axe, float seuil) {
     // TODO: Implémenter la vérification d'alerte
-    return false;
+    if(courant_en_amperes(axe.courant)>seuil){
+        return true;
+    }
+    else{
+        return false;
+    }
 }
 
 /**
@@ -197,6 +206,7 @@ bool analyser_trame(const Trame& trame, Statistiques& stats, float seuil) {
 
     // TODO: Vérifier si la séquence est bonne avec sequence_min et sequence_max
     // TODO: Vérifier si un axe est en alerte et retourner le résultat
+    
     
     return false;
 }
@@ -311,7 +321,6 @@ int main(int argc, char* argv[]) {
     // ========================================================================
     // Analyse des arguments
     // ========================================================================
-    
     if (argc < 2) {
         afficher_aide(argv[0]);
         return 1;
