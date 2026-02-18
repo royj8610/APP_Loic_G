@@ -206,7 +206,20 @@ bool analyser_trame(const Trame& trame, Statistiques& stats, float seuil) {
 
     // TODO: Vérifier si la séquence est bonne avec sequence_min et sequence_max
     // TODO: Vérifier si un axe est en alerte et retourner le résultat
-    
+
+    if (trame.SEQ < stats.sequence_min) {
+        stats.sequence_min = trame.SEQ;
+    }
+    if (trame.SEQ > stats.sequence_max) {
+        stats.sequence_max = trame.SEQ;
+    }   
+
+    for (size_t i = 0; i < NB_AXES; i++) {
+        if (est_en_alerte(trame.Axes[i], seuil)) {
+            stats.trames_alerte++;
+            return true;
+        }
+    }   
     
     return false;
 }
@@ -232,6 +245,12 @@ std::vector<uint8_t> lire_donnees(const std::string& source) {
         // - Ou lire par blocs dans un tampon temporaire
         // - Arrêter quand std::cin.eof() est vrai
         
+        uint8_t octet;
+        while (std::cin.get(reinterpret_cast<char&>(octet))) {
+            buffer.push_back(octet);
+        }
+        
+        
     } else {
         // Lecture depuis un fichier
         // TODO: Ouvrir le fichier en mode binaire et lire son contenu
@@ -241,12 +260,37 @@ std::vector<uint8_t> lire_donnees(const std::string& source) {
         // - Vérifier que le fichier est ouvert avec is_open()
         // - Déterminer la taille avec seekg/tellg
         // - Redimensionner le buffer et lire avec read()
-        
+        std::ifstream fichier(source, std::ios::binary);
+        if (!fichier.is_open()) {
+            throw std::runtime_error("Impossible d'ouvrir le fichier " + source);
+        }
+        fichier.seekg(0, std::ios::end);
+        size_t taille = fichier.tellg();
+        fichier.seekg(0, std::ios::beg);
+        buffer.resize(taille);
+        fichier.read(reinterpret_cast<char*>(buffer.data()), taille);
     }
     
     return buffer;
 }
 
+
+std::vector<uint8_t> lire_fichier(const std::string& chemin) {
+    std::ifstream fichier(chemin, std::ios::binary);
+
+    // Déterminer la taille
+    fichier.seekg(0, std::ios::end);
+    size_t taille = fichier.tellg();
+    fichier.seekg(0, std::ios::beg);
+
+    // Créer un vecteur de la bonne taille
+    std::vector<uint8_t> buffer(taille);
+
+    // Lire directement dans le vecteur
+    fichier.read(reinterpret_cast<char*>(buffer.data()), taille);
+
+    return buffer;
+}
 /**
  * @brief Écrit une ligne de rapport pour une trame
  * @param sortie Flux de sortie
@@ -294,6 +338,12 @@ void ecrire_statistiques(std::ostream& sortie, const Statistiques& stats) {
         
         // TODO: Calculer et afficher le nombre de trames potentiellement perdues
         //       basé sur les numéros de séquence (attention au wrap-around de 255 à 0)
+
+        int trames_perdues = static_cast<int>(stats.sequence_max) - static_cast<int>(stats.sequence_min) - 1;
+        if (trames_perdues < 0) {
+            trames_perdues += 256; // Gestion du wrap-around
+        }
+        sortie << "Trames perdues      : " << trames_perdues << "\n";
     }
     
     sortie << "========================================\n";
