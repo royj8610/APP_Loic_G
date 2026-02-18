@@ -51,14 +51,14 @@ struct DonneesAxe {
     int16_t vitesse;
     uint16_t courant;  
 };
-
-struct __attribute__((packed)) Trame {
+#pragma (push,1)
+struct  Trame {
     uint8_t SYNC_1;
     uint8_t SYNC_2;
     uint8_t SEQ;
     DonneesAxe Axes[6];
 };
-
+#pragma (pop)
 // Structure pour les statistiques (déjà complète)
 struct Statistiques {
     size_t octets_lus = 0;
@@ -162,18 +162,34 @@ bool trame_valide(const Trame* trame) {
  */
 bool decoder_trame(const uint8_t* buffer, Trame& trame) {
     // TODO: Implémenter le décodage de la trame
-    //
     // Si vos structures sont bien définies et alignées, un simple
     // transtypage peut suffire.
-    Trame* t = (Trame*)buffer;
-    trame = *t;
-    if (trame_valide(t)){
-        return true;
+    trame.SYNC_1 = buffer[0];
+    trame.SYNC_2 = buffer[1];
+    trame.SEQ = buffer[2];
+
+    uint16_t temp = 0; // variable temporaire d'opération initialisé à 0 (vide)
+
+    for (int NbAxe=0; NbAxe<6; NbAxe++){
+        for(int donne = 0; donne < 6; donne+=2 ){
+            temp = temp + buffer[donne+4];        // décalage little-endian (8 derniers bits sur 16)
+            temp = (temp << 8) + buffer[donne+3]; // ajout des 8 premiers bits
+                if(donne == 0){                   // injection des données décodés 
+                    trame.Axes[NbAxe].position = temp;  
+                }
+                else if (donne == 2){
+                    trame.Axes[NbAxe].vitesse = temp;
+                }
+                else if (donne == 4){
+                    trame.Axes[NbAxe].courant = temp;
+                }
+            }
+            buffer +=6;
+        }
+    return true;
     }
 
-    return false;
-}
-
+    
 // ============================================================================
 // Fonctions d'analyse
 // ============================================================================
