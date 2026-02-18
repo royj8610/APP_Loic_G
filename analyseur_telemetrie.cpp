@@ -174,11 +174,11 @@ bool decoder_trame(const uint8_t* buffer, Trame& trame) {
     trame.SEQ = buffer[2];
 
     uint16_t temp = 0; // variable temporaire d'opération initialisé à 0 (vide)
-    buffer +=3;
+    buffer +=3; // decalage buffer initial
     for (int NbAxe=0; NbAxe<6; NbAxe++){
         for(int donne = 0; donne < 6; donne+=2 ){
             temp = temp + buffer[donne+1];        // décalage little-endian (8 derniers bits sur 16)
-            temp = (temp << 8) + buffer[donne]; // ajout des 8 premiers bits
+            temp = (temp << 8) + buffer[donne];   // ajout des 8 premiers bits
                 if(donne == 0){                   // injection des données décodés 
                     trame.Axes[NbAxe].position = temp;
                 }
@@ -188,9 +188,9 @@ bool decoder_trame(const uint8_t* buffer, Trame& trame) {
                 else if (donne == 4){
                     trame.Axes[NbAxe].courant = temp;
                 }
-                temp = 0;
+                temp = 0; // reinit de variable temporaire
             }
-            buffer +=6;
+            buffer +=6; // decalage du pointeur buffer
         }
     return true;
     }
