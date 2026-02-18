@@ -309,8 +309,16 @@ void ecrire_rapport_trame(std::ostream& sortie, const Trame& trame, float seuil)
         // - Ajouter "[!ALERTE!]" si le courant dépasse le seuil
         
         sortie << "  Axe " << (i + 1) << ": ";
-        
-        // TODO: Compléter l'affichage
+        sortie << std::fixed << std::setprecision(2);
+        sortie << position_en_degres(trame.Axes[i].position) << "° | ";
+        sortie << std::fixed << std::setprecision(1);
+        sortie << vitesse_en_deg_s(trame.Axes[i].position) << "°/s | ";
+        sortie << std::fixed << std::setprecision(3);
+        sortie << position_en_degres(trame.Axes[i].vitesse) << "A ";
+
+        if (est_en_alerte(trame.Axes[i], seuil)) {
+            sortie << "[!ALERTE!]";
+        }
         
         sortie << "\n";
     }
@@ -437,6 +445,30 @@ int main(int argc, char* argv[]) {
     // - Analyser les trames valides avec analyser_trame
     // - Écrire le rapport de chaque trame avec ecrire_rapport_trame
     // - Mettre à jour les statistiques
+
+    for(size_t pos = 0; pos < buffer.size();) {
+        int sync_pos = trouver_sync(buffer.data(), buffer.size(), pos);
+        if (sync_pos == -1) {
+            stats.octets_bruit += buffer.size() - pos;
+            break; // Plus de trames possibles
+        }
+        
+        if (sync_pos + TAILLE_TRAME > buffer.size()) {
+            stats.octets_bruit += buffer.size() - sync_pos;
+            break; // Trame incomplète à la fin
+        }
+        
+        Trame trame;
+        if (decoder_trame(buffer.data() + sync_pos, trame)) {
+            stats.trames_valides++;
+            bool alerte = analyser_trame(trame, stats, seuil_courant);
+            ecrire_rapport_trame(*sortie, trame, seuil_courant);
+        } else {
+            stats.octets_bruit += 1; // Sync trouvé mais trame invalide
+        }
+        
+        pos = sync_pos + 1; // Continuer la recherche après le sync actuel
+    }
 
 
 
