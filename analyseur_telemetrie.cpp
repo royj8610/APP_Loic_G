@@ -47,9 +47,9 @@ const size_t TAILLE_TRAME = TAILLE_ENTETE + NB_AXES * TAILLE_AXE;  // 39 octets
 // Attention: Pensez à l'alignement des structures!
 
 struct DonneesAxe {
-    int16_t position;
-    int16_t vitesse;
-    uint16_t courant;  
+    uint16_t position;
+    uint16_t vitesse;
+    uint16_t courant;   
 };
 #pragma pack(push,1)
 struct  Trame { //J'ai fait des recherche google aucun AI
@@ -190,7 +190,6 @@ bool decoder_trame(const uint8_t* buffer, Trame& trame) {
     return true;
     }
 
-    
 // ============================================================================
 // Fonctions d'analyse
 // ============================================================================
@@ -322,7 +321,7 @@ void ecrire_rapport_trame(std::ostream& sortie, const Trame& trame, float seuil)
         //   "  Axe N: XXX.XX° | XXX.X°/s | X.XXX A [ALERTE]"
         //
         // INDICES:
-        // - Utiliser std::fixed et std::setprecision() pour le formata// Trame incomplète à la finge
+        // - Utiliser std::fixed et std::setprecision() pour le formatage
         // - Ajouter "[!ALERTE!]" si le courant dépasse le seuil
         
         sortie << "  Axe " << (i + 1) << ": ";
@@ -331,7 +330,7 @@ void ecrire_rapport_trame(std::ostream& sortie, const Trame& trame, float seuil)
         sortie << std::fixed << std::setprecision(1);
         sortie << vitesse_en_deg_s(trame.Axes[i].vitesse) << "°/s | ";
         sortie << std::fixed << std::setprecision(3);
-        sortie << courant_en_amperes(trame.Axes[i].vitesse) << "A ";
+        sortie << courant_en_amperes(trame.Axes[i].courant) << "A ";
 
         if (est_en_alerte(trame.Axes[i], seuil)) {
             sortie << "[!ALERTE!]";
@@ -453,7 +452,7 @@ int main(int argc, char* argv[]) {
     
     *sortie << "Analyse de télémétrie - Seuil d'alerte: " << seuil_courant << " A\n";
     *sortie << "========================================\n\n";
-
+    
     // TODO: Implémenter la boucle principale de traitement
     //
     // INDICES:
@@ -463,23 +462,32 @@ int main(int argc, char* argv[]) {
     // - Écrire le rapport de chaque trame avec ecrire_rapport_trame
     // - Mettre à jour les statistiques
 
-    size_t pos = 0;
-
-    while (pos < buffer.size()) {
+    for(size_t pos = 0; pos < buffer.size();) {
         int sync_pos = trouver_sync(buffer.data(), buffer.size(), pos);
-
-        // Compter les octets de bruit avant le sync
-        stats.octets_bruit += sync_pos - pos;
-
+        if (sync_pos == -1) {
+            stats.octets_bruit += buffer.size() - pos;
+            break; // Plus de trames possibles
+        }
+        
+        if (sync_pos + TAILLE_TRAME > buffer.size()) {
+            stats.octets_bruit += buffer.size() - sync_pos;
+            break; // Trame incomplète à la fin
+        }
+        
         Trame trame;
         if (decoder_trame(buffer.data() + sync_pos, trame)) {
             stats.trames_valides++;
-            analyser_trame(trame, stats, seuil_courant);
+            bool alerte = analyser_trame(trame, stats, seuil_courant);
             ecrire_rapport_trame(*sortie, trame, seuil_courant);
+        } else {
+            stats.octets_bruit += 1; // Sync trouvé mais trame invalide
         }
-
-        pos = sync_pos + TAILLE_TRAME;
+        
+        pos = sync_pos + 1; // Continuer la recherche après le sync actuel
     }
+
+
+
     
     // ========================================================================
     // Affichage des statistiques
