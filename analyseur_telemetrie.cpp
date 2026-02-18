@@ -51,13 +51,8 @@ struct DonneesAxe {
     int16_t vitesse;
     uint16_t courant;  
 };
-<<<<<<< HEAD
-#pragma (push,1)
-struct  Trame {
-=======
 #pragma pack(push,1)
 struct  Trame { //J'ai fait des recherche google aucun AI
->>>>>>> 7858f61 (debug de decode_trame)
     uint8_t SYNC_1;
     uint8_t SYNC_2;
     uint8_t SEQ;
@@ -336,11 +331,7 @@ void ecrire_rapport_trame(std::ostream& sortie, const Trame& trame, float seuil)
         sortie << std::fixed << std::setprecision(1);
         sortie << vitesse_en_deg_s(trame.Axes[i].vitesse) << "°/s | ";
         sortie << std::fixed << std::setprecision(3);
-<<<<<<< HEAD
         sortie << courant_en_amperes(trame.Axes[i].vitesse) << "A ";
-=======
-        sortie << courant_en_amperes(trame.Axes[i].courant) << "A ";
->>>>>>> 7858f61 (debug de decode_trame)
 
         if (est_en_alerte(trame.Axes[i], seuil)) {
             sortie << "[!ALERTE!]";
