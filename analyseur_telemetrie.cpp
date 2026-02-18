@@ -47,18 +47,18 @@ const size_t TAILLE_TRAME = TAILLE_ENTETE + NB_AXES * TAILLE_AXE;  // 39 octets
 // Attention: Pensez à l'alignement des structures!
 
 struct DonneesAxe {
-    uint16_t position;
-    uint16_t vitesse;
-    uint16_t courant;   
+    int16_t position;
+    int16_t vitesse;
+    uint16_t courant;  
 };
-#pragma (push,1)
-struct  Trame { //J'ai fait des recherche google aucun AI
+
+struct __attribute__((packed)) Trame {
     uint8_t SYNC_1;
     uint8_t SYNC_2;
     uint8_t SEQ;
     DonneesAxe Axes[6];
 };
-#pragma (pop)
+
 // Structure pour les statistiques (déjà complète)
 struct Statistiques {
     size_t octets_lus = 0;
@@ -162,32 +162,17 @@ bool trame_valide(const Trame* trame) {
  */
 bool decoder_trame(const uint8_t* buffer, Trame& trame) {
     // TODO: Implémenter le décodage de la trame
+    //
     // Si vos structures sont bien définies et alignées, un simple
     // transtypage peut suffire.
-    trame.SYNC_1 = buffer[0];
-    trame.SYNC_2 = buffer[1];
-    trame.SEQ = buffer[2];
-
-    uint16_t temp = 0; // variable temporaire d'opération initialisé à 0 (vide)
-
-    for (int NbAxe=0; NbAxe<6; NbAxe++){
-        for(int donne = 0; donne < 6; donne+=2 ){
-            temp = temp + buffer[donne+4];        // décalage little-endian (8 derniers bits sur 16)
-            temp = (temp << 8) + buffer[donne+3]; // ajout des 8 premiers bits
-                if(donne == 0){                   // injection des données décodés 
-                    trame.Axes[NbAxe].position = temp;  
-                }
-                else if (donne == 2){
-                    trame.Axes[NbAxe].vitesse = temp;
-                }
-                else if (donne == 4){
-                    trame.Axes[NbAxe].courant = temp;
-                }
-            }
-            buffer +=6;
-        }
-    return true;
+    Trame* t = (Trame*)buffer;
+    trame = *t;
+    if (trame_valide(t)){
+        return true;
     }
+
+    return false;
+}
 
 // ============================================================================
 // Fonctions d'analyse
@@ -329,7 +314,7 @@ void ecrire_rapport_trame(std::ostream& sortie, const Trame& trame, float seuil)
         sortie << std::fixed << std::setprecision(1);
         sortie << vitesse_en_deg_s(trame.Axes[i].position) << "°/s | ";
         sortie << std::fixed << std::setprecision(3);
-        sortie << position_en_degres(trame.Axes[i].vitesse) << "A ";
+        sortie << courant_en_amperes(trame.Axes[i].vitesse) << "A ";
 
         if (est_en_alerte(trame.Axes[i], seuil)) {
             sortie << "[!ALERTE!]";
@@ -451,7 +436,7 @@ int main(int argc, char* argv[]) {
     
     *sortie << "Analyse de télémétrie - Seuil d'alerte: " << seuil_courant << " A\n";
     *sortie << "========================================\n\n";
-    
+
     // TODO: Implémenter la boucle principale de traitement
     //
     // INDICES:
@@ -461,25 +446,23 @@ int main(int argc, char* argv[]) {
     // - Écrire le rapport de chaque trame avec ecrire_rapport_trame
     // - Mettre à jour les statistiques
 
-    for(size_t pos = 0; pos < buffer.size();) {
+    size_t pos = 0;
+
+    while (pos < buffer.size()) {
         int sync_pos = trouver_sync(buffer.data(), buffer.size(), pos);
-        
-        if (sync_pos + TAILLE_TRAME > buffer.size()) {
-            break; // Pas assez d'octets pour une trame complète après le sync
-        }
-        
+
+        // Compter les octets de bruit avant le sync
+        stats.octets_bruit += sync_pos - pos;
+
         Trame trame;
         if (decoder_trame(buffer.data() + sync_pos, trame)) {
             stats.trames_valides++;
-            bool alerte = analyser_trame(trame, stats, seuil_courant);
+            analyser_trame(trame, stats, seuil_courant);
             ecrire_rapport_trame(*sortie, trame, seuil_courant);
-        } 
-        
-        pos = sync_pos + TAILLE_TRAME; // Continuer la recherche après la trame actuelle
+        }
+
+        pos = sync_pos + TAILLE_TRAME;
     }
-
-
-
     
     // ========================================================================
     // Affichage des statistiques
