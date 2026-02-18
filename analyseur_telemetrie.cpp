@@ -51,14 +51,19 @@ struct DonneesAxe {
     int16_t vitesse;
     uint16_t courant;  
 };
+<<<<<<< HEAD
 #pragma (push,1)
 struct  Trame {
+=======
+#pragma pack(push,1)
+struct  Trame { //J'ai fait des recherche google aucun AI
+>>>>>>> 7858f61 (debug de decode_trame)
     uint8_t SYNC_1;
     uint8_t SYNC_2;
     uint8_t SEQ;
     DonneesAxe Axes[6];
 };
-#pragma (pop)
+#pragma pack(pop)
 // Structure pour les statistiques (déjà complète)
 struct Statistiques {
     size_t octets_lus = 0;
@@ -79,7 +84,7 @@ struct Statistiques {
  * @return Position en degrés (float)
  */
 float position_en_degres(int16_t brut) {
-    float position_deg=brut/100.0f;
+    float position_deg=(float)brut/100.0f;
     return position_deg;
 }
 
@@ -89,7 +94,7 @@ float position_en_degres(int16_t brut) {
  * @return Vitesse en degrés/seconde (float)
  */
 float vitesse_en_deg_s(int16_t brut) {
-    float vitesse_deg=brut/10.0f;
+    float vitesse_deg=(float)brut/10.0f;
     return vitesse_deg;
 }
 
@@ -99,7 +104,7 @@ float vitesse_en_deg_s(int16_t brut) {
  * @return Courant en ampères (float)
  */
 float courant_en_amperes(uint16_t brut) {
-    float courant_amp=brut/1000.0f;
+    float courant_amp=(float)brut/1000.0f;
     return courant_amp;
 }
 
@@ -169,13 +174,13 @@ bool decoder_trame(const uint8_t* buffer, Trame& trame) {
     trame.SEQ = buffer[2];
 
     uint16_t temp = 0; // variable temporaire d'opération initialisé à 0 (vide)
-
+    buffer +=3;
     for (int NbAxe=0; NbAxe<6; NbAxe++){
         for(int donne = 0; donne < 6; donne+=2 ){
-            temp = temp + buffer[donne+4];        // décalage little-endian (8 derniers bits sur 16)
-            temp = (temp << 8) + buffer[donne+3]; // ajout des 8 premiers bits
+            temp = temp + buffer[donne+1];        // décalage little-endian (8 derniers bits sur 16)
+            temp = (temp << 8) + buffer[donne]; // ajout des 8 premiers bits
                 if(donne == 0){                   // injection des données décodés 
-                    trame.Axes[NbAxe].position = temp;  
+                    trame.Axes[NbAxe].position = temp;
                 }
                 else if (donne == 2){
                     trame.Axes[NbAxe].vitesse = temp;
@@ -183,6 +188,7 @@ bool decoder_trame(const uint8_t* buffer, Trame& trame) {
                 else if (donne == 4){
                     trame.Axes[NbAxe].courant = temp;
                 }
+                temp = 0;
             }
             buffer +=6;
         }
@@ -328,9 +334,13 @@ void ecrire_rapport_trame(std::ostream& sortie, const Trame& trame, float seuil)
         sortie << std::fixed << std::setprecision(2);
         sortie << position_en_degres(trame.Axes[i].position) << "° | ";
         sortie << std::fixed << std::setprecision(1);
-        sortie << vitesse_en_deg_s(trame.Axes[i].position) << "°/s | ";
+        sortie << vitesse_en_deg_s(trame.Axes[i].vitesse) << "°/s | ";
         sortie << std::fixed << std::setprecision(3);
+<<<<<<< HEAD
         sortie << courant_en_amperes(trame.Axes[i].vitesse) << "A ";
+=======
+        sortie << courant_en_amperes(trame.Axes[i].courant) << "A ";
+>>>>>>> 7858f61 (debug de decode_trame)
 
         if (est_en_alerte(trame.Axes[i], seuil)) {
             sortie << "[!ALERTE!]";
