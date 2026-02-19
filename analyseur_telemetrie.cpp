@@ -44,7 +44,6 @@ const size_t TAILLE_TRAME = TAILLE_ENTETE + NB_AXES * TAILLE_AXE;  // 39 octets
 // Structures de données
 // ============================================================================
 
-// TODO 1: Définir les structures pour les trames et les données des axes. 
 // Attention: Pensez à l'alignement des structures!
 
 struct DonneesAxe {
@@ -52,8 +51,8 @@ struct DonneesAxe {
     uint16_t vitesse;
     uint16_t courant;   
 };
-#pragma pack(push,1)
-struct  Trame { //J'ai fait des recherche google aucun AI
+#pragma pack(push,1) // Empeche le padding pour la reinterpretation dans decoder trame
+struct  Trame { 
     uint8_t SYNC_1;
     uint8_t SYNC_2;
     uint8_t SEQ;
@@ -80,7 +79,7 @@ size_t trames_perdues = 0;
  * @return Position en degrés (float)
  */
 float position_en_degres(int16_t brut) {
-    float position_deg=(float)brut/100.0f;
+    float position_deg=(float)brut/100.0f; // La valeur brut est divisé par 100
     return position_deg;
 }
 
@@ -90,7 +89,7 @@ float position_en_degres(int16_t brut) {
  * @return Vitesse en degrés/seconde (float)
  */
 float vitesse_en_deg_s(int16_t brut) {
-    float vitesse_deg=(float)brut/10.0f;
+    float vitesse_deg=(float)brut/10.0f; // La valeur brut est divisé par 10
     return vitesse_deg;
 }
 
@@ -100,7 +99,7 @@ float vitesse_en_deg_s(int16_t brut) {
  * @return Courant en ampères (float)
  */
 float courant_en_amperes(uint16_t brut) {
-    float courant_amp=(float)brut/1000.0f;
+    float courant_amp=(float)brut/1000.0f; // La valeur brut est divisé par 1000
     return courant_amp;
 }
 
@@ -121,11 +120,11 @@ float courant_en_amperes(uint16_t brut) {
  * @return Position de la séquence de sync, ou -1 si non trouvée
  */
 int trouver_sync(const uint8_t* buffer, size_t taille, size_t debut) {
-    // TODO: Implémenter la recherche des octets de synchronisation
-    // Attention à ne pas dépasser les limites du tampon!
+
+
 for (size_t i = debut; i < taille - 1; i++) {
-        if (buffer[i] == SYNC_H && buffer[i + 1] == SYNC_L) {
-            return i;  // Position trouvée
+        if (buffer[i] == SYNC_H && buffer[i + 1] == SYNC_L) { //Cherche la suite d'octet 0xAA et 0x55
+            return i;  // Retourne la position de 0xAA
         }
     }
     return -1;  // Non trouvé
@@ -141,12 +140,12 @@ for (size_t i = debut; i < taille - 1; i++) {
  * @return true si la trame est valide, false sinon
  */
 bool trame_valide(const Trame* trame) {
-    // TODO: Implémenter la vérification de validité
-    if (trame->SYNC_1==SYNC_H && trame->SYNC_2==SYNC_L){
+
+    if (trame->SYNC_1==SYNC_H && trame->SYNC_2==SYNC_L){ //Vérifie que les octect SYNC_1 et SYNC_2 sont égal a ce qui est recherché
         return true;
     }
     else{
-        return false;
+        return false; // Retourne False si ce n'est pas le cas
     }
 }
 
@@ -202,8 +201,8 @@ bool decoder_trame(const uint8_t* buffer, Trame& trame) {
  * @return true si le courant dépasse le seuil
  */
 bool est_en_alerte(const DonneesAxe& axe, float seuil) {
-    // TODO: Implémenter la vérification d'alerte
-    if(courant_en_amperes(axe.courant)>seuil){
+
+    if(courant_en_amperes(axe.courant)>seuil){ //Vérifie que le courant de l'axe est sous le seuil
         return true;
     }
     else{
@@ -223,15 +222,15 @@ bool analyser_trame(const Trame& trame, Statistiques& stats, float seuil) {
 
 
     if (trame.SEQ < stats.sequence_min) {
-        stats.sequence_min = trame.SEQ;
+        stats.sequence_min = trame.SEQ; // Garde en mémoire le numéro de séquence minimum lu
     }
     if (trame.SEQ > stats.sequence_max) {
-        stats.sequence_max = trame.SEQ;
+        stats.sequence_max = trame.SEQ; // Garde en mémoire le numéro de séquence maximum lu
     }   
 
     for (size_t i = 0; i < NB_AXES; i++) {
-        if (est_en_alerte(trame.Axes[i], seuil)) {
-            stats.trames_alerte++;
+        if (est_en_alerte(trame.Axes[i], seuil)) { //Vérifie que le courant de chaque axe ne depasse pas le seuil
+            stats.trames_alerte++; //Ajoute 1 au nombre de trame en alerte
             return true;
         }
     }   
@@ -261,7 +260,7 @@ std::vector<uint8_t> lire_donnees(const std::string& source) {
         
         uint8_t octet;
         while (std::cin.get(reinterpret_cast<char&>(octet))) {
-            buffer.push_back(octet);
+            buffer.push_back(octet); //Ajoute un octet a la fin de buffer tant qu'il y en a
         }
         
         
@@ -276,13 +275,13 @@ std::vector<uint8_t> lire_donnees(const std::string& source) {
         // - Redimensionner le buffer et lire avec read()
         std::ifstream fichier(source, std::ios::binary);
         if (!fichier.is_open()) {
-            throw std::runtime_error("Impossible d'ouvrir le fichier " + source);
+            throw std::runtime_error("Impossible d'ouvrir le fichier " + source); //Renvoi une errreur si incapale d'ouvir le fichier
         }
-        fichier.seekg(0, std::ios::end);
-        size_t taille = fichier.tellg();
-        fichier.seekg(0, std::ios::beg);
-        buffer.resize(taille);
-        fichier.read(reinterpret_cast<char*>(buffer.data()), taille);
+        fichier.seekg(0, std::ios::end); //Envoi le curseur a la fin du fichier
+        size_t taille = fichier.tellg(); //Écrit la position actuel du curseur dans taille
+        fichier.seekg(0, std::ios::beg); //Envoi le curseur au début du fichier
+        buffer.resize(taille); //Défini la taille du buffer
+        fichier.read(reinterpret_cast<char*>(buffer.data()), taille); // Reinterpret les données du fichier et les envoies dans buffer
     }
     
     return buffer;
@@ -306,7 +305,7 @@ void ecrire_rapport_trame(std::ostream& sortie, const Trame& trame, float seuil)
         // - Ajouter "[!ALERTE!]" si le courant dépasse le seuil
         
         sortie << "  Axe " << (i + 1) << ": ";
-        sortie << std::fixed << std::setprecision(2);
+        sortie << std::fixed << std::setprecision(2); //Défini la facon d'écrire les données et limite le nombre de chiffre après la virgule a deux
         sortie << position_en_degres(trame.Axes[i].position) << "° | ";
         sortie << std::fixed << std::setprecision(1);
         sortie << vitesse_en_deg_s(trame.Axes[i].vitesse) << "°/s | ";
@@ -314,7 +313,7 @@ void ecrire_rapport_trame(std::ostream& sortie, const Trame& trame, float seuil)
         sortie << courant_en_amperes(trame.Axes[i].courant) << "A ";
 
         if (est_en_alerte(trame.Axes[i], seuil)) {
-            sortie << "[!ALERTE!]";
+            sortie << "[!ALERTE!]"; // Si le seuil de courant est dépasser écrit ALERTE
         }
         
         sortie << "\n";
@@ -441,33 +440,32 @@ int main(int argc, char* argv[]) {
 uint8_t dernier_num_seq = 0;
 
 for(size_t pos = 0; pos < buffer.size();) {
-    int sync_pos = trouver_sync(buffer.data(), buffer.size(), pos);
+    int sync_pos = trouver_sync(buffer.data(), buffer.size(), pos); // Parcour le buffer pour trouver les octets de syncronisation
 
-    if (sync_pos==-1){
+    if (sync_pos==-1){ //Arrete la boucle for si aucun octet de syncronisation est trouvé
         break;
     }
 
     Trame trame;
     if (decoder_trame(buffer.data() + sync_pos, trame)) {
-        stats.trames_valides++;
+        stats.trames_valides++; //Ajoute 1 a trame valide si decoder trame a réussi
 
         analyser_trame(trame, stats, seuil_courant);
 
-        if (stats.trames_valides == 1) {
-            // Initialisation sur la première trame
+        if (stats.trames_valides == 1) { //Trouve le numéro de séquence de la première trame decoder
             dernier_num_seq = trame.SEQ;
         } 
         else {
             uint8_t attendu = dernier_num_seq + 1;
             uint8_t seq_actuel = trame.SEQ;
 
-            if (attendu != seq_actuel) {
+            if (attendu != seq_actuel) { //Ajoute le nombre le nombre de trame perdu si les numéro de trame ne se suivent pas
                 uint8_t diff = (seq_actuel-1 - dernier_num_seq);
                 trames_perdues += diff;
             }
         }
 
-        dernier_num_seq = trame.SEQ;
+        dernier_num_seq = trame.SEQ; //Change le dernier numéro de trame pour la prochaine exécution de la boucle for
 
         ecrire_rapport_trame(*sortie, trame, seuil_courant);
     }
@@ -475,7 +473,7 @@ for(size_t pos = 0; pos < buffer.size();) {
     pos = sync_pos + 39; // Continuer la recherche après le sync actuel
 }
 
-stats.octets_bruit = stats.octets_lus-(stats.trames_valides*TAILLE_TRAME);
+stats.octets_bruit = stats.octets_lus-(stats.trames_valides*TAILLE_TRAME); //Calcul le nombre d'octet de bruit
 
 
 
