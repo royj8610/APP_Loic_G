@@ -39,6 +39,7 @@ const size_t TAILLE_AXE = 6;        // 2 + 2 + 2 octets
 const size_t TAILLE_ENTETE = 3;     // sync1 + sync2 + sequence
 const size_t TAILLE_TRAME = TAILLE_ENTETE + NB_AXES * TAILLE_AXE;  // 39 octets
 
+
 // ============================================================================
 // Structures de données
 // ============================================================================
@@ -68,7 +69,7 @@ struct Statistiques {
     uint8_t sequence_max = 0;
     size_t octets_bruit = 0;
 };
-
+size_t trames_perdues = 0;
 // ============================================================================
 // Fonctions de conversion
 // ============================================================================
@@ -220,8 +221,6 @@ bool est_en_alerte(const DonneesAxe& axe, float seuil) {
 bool analyser_trame(const Trame& trame, Statistiques& stats, float seuil) {
     // Mettre à jour les statistiques de séquence
 
-    // TODO: Vérifier si la séquence est bonne avec sequence_min et sequence_max
-    // TODO: Vérifier si un axe est en alerte et retourner le résultat
 
     if (trame.SEQ < stats.sequence_min) {
         stats.sequence_min = trame.SEQ;
@@ -254,7 +253,6 @@ std::vector<uint8_t> lire_donnees(const std::string& source) {
     
     if (source == "-") {
         // Lecture depuis stdin
-        // TODO: Lire tous les octets de std::cin dans le buffer
         //
         // INDICES:
         // - Utiliser std::cin.get() pour lire octet par octet
@@ -269,7 +267,7 @@ std::vector<uint8_t> lire_donnees(const std::string& source) {
         
     } else {
         // Lecture depuis un fichier
-        // TODO: Ouvrir le fichier en mode binaire et lire son contenu
+
         //
         // INDICES:
         // - std::ifstream fichier(source, std::ios::binary)
@@ -290,23 +288,6 @@ std::vector<uint8_t> lire_donnees(const std::string& source) {
     return buffer;
 }
 
-
-std::vector<uint8_t> lire_fichier(const std::string& chemin) {
-    std::ifstream fichier(chemin, std::ios::binary);
-
-    // Déterminer la taille
-    fichier.seekg(0, std::ios::end);
-    size_t taille = fichier.tellg();
-    fichier.seekg(0, std::ios::beg);
-
-    // Créer un vecteur de la bonne taille
-    std::vector<uint8_t> buffer(taille);
-
-    // Lire directement dans le vecteur
-    fichier.read(reinterpret_cast<char*>(buffer.data()), taille);
-
-    return buffer;
-}
 /**
  * @brief Écrit une ligne de rapport pour une trame
  * @param sortie Flux de sortie
@@ -360,13 +341,9 @@ void ecrire_statistiques(std::ostream& sortie, const Statistiques& stats) {
         sortie << "Séquence min        : " << static_cast<int>(stats.sequence_min) << "\n";
         sortie << "Séquence max        : " << static_cast<int>(stats.sequence_max) << "\n";
         
-        // TODO: Calculer et afficher le nombre de trames potentiellement perdues
+
         //       basé sur les numéros de séquence (attention au wrap-around de 255 à 0)
 
-        int trames_perdues = static_cast<int>(stats.sequence_max) - static_cast<int>(stats.sequence_min) - 1;
-        if (trames_perdues < 0) {
-            trames_perdues += 256; // Gestion du wrap-around
-        }
         sortie << "Trames perdues      : " << trames_perdues << "\n";
     }
     
@@ -453,7 +430,6 @@ int main(int argc, char* argv[]) {
     *sortie << "Analyse de télémétrie - Seuil d'alerte: " << seuil_courant << " A\n";
     *sortie << "========================================\n\n";
     
-    // TODO: Implémenter la boucle principale de traitement
     //
     // INDICES:
     // - Parcourir le buffer pour trouver les trames (avec trouver_sync)
@@ -462,29 +438,44 @@ int main(int argc, char* argv[]) {
     // - Écrire le rapport de chaque trame avec ecrire_rapport_trame
     // - Mettre à jour les statistiques
 
-    for(size_t pos = 0; pos < buffer.size();) {
-        int sync_pos = trouver_sync(buffer.data(), buffer.size(), pos);
-        if (sync_pos == -1) {
-            stats.octets_bruit += buffer.size() - pos;
-            break; // Plus de trames possibles
-        }
-        
-        if (sync_pos + TAILLE_TRAME > buffer.size()) {
-            stats.octets_bruit += buffer.size() - sync_pos;
-            break; // Trame incomplète à la fin
-        }
-        
-        Trame trame;
-        if (decoder_trame(buffer.data() + sync_pos, trame)) {
-            stats.trames_valides++;
-            bool alerte = analyser_trame(trame, stats, seuil_courant);
-            ecrire_rapport_trame(*sortie, trame, seuil_courant);
-        } else {
-            stats.octets_bruit += 1; // Sync trouvé mais trame invalide
-        }
-        
-        pos = sync_pos + 1; // Continuer la recherche après le sync actuel
+uint8_t dernier_num_seq = 0;
+
+for(size_t pos = 0; pos < buffer.size();) {
+    int sync_pos = trouver_sync(buffer.data(), buffer.size(), pos);
+
+    if (sync_pos==-1){
+        break;
     }
+
+    Trame trame;
+    if (decoder_trame(buffer.data() + sync_pos, trame)) {
+        stats.trames_valides++;
+
+        analyser_trame(trame, stats, seuil_courant);
+
+        if (stats.trames_valides == 1) {
+            // Initialisation sur la première trame
+            dernier_num_seq = trame.SEQ;
+        } 
+        else {
+            uint8_t attendu = dernier_num_seq + 1;
+            uint8_t seq_actuel = trame.SEQ;
+
+            if (attendu != seq_actuel) {
+                uint8_t diff = (seq_actuel-1 - dernier_num_seq);
+                trames_perdues += diff;
+            }
+        }
+
+        dernier_num_seq = trame.SEQ;
+
+        ecrire_rapport_trame(*sortie, trame, seuil_courant);
+    }
+
+    pos = sync_pos + 39; // Continuer la recherche après le sync actuel
+}
+
+stats.octets_bruit = stats.octets_lus-(stats.trames_valides*TAILLE_TRAME);
 
 
 
