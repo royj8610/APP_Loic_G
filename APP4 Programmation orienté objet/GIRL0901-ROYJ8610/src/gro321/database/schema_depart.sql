@@ -55,7 +55,6 @@ CREATE TABLE IF NOT EXISTS bons_travail (
     mise_a_jour_reussie INTEGER,  -- Pour mise à jour (0/1/NULL)
     composant TEXT,           -- Pour réparation
     probleme TEXT,            -- Pour réparation
-    pieces_utilisees TEXT,    -- Pour réparation (JSON)
 
     FOREIGN KEY (numero_serie) REFERENCES robots(numero_serie),
     CHECK (type_bon IN ('diagnostic', 'mise_a_jour', 'reparation')),

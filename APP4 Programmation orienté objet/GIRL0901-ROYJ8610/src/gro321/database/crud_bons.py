@@ -76,7 +76,18 @@ def creer_bon_diagnostic(numero_serie, symptomes, db_path="data/gro321.db"):
         ID du bon créé
     """
     # TODO: Implémenter cette fonction
-    pass
+
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        date_creation = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        cursor.execute(
+            """
+            INSERT INTO bons_travail (type_bon, numero_serie, symptomes, date_creation, statut)
+            VALUES (?, ?, ?, ?, ?)
+        """,
+            ('diagnostic', numero_serie, symptomes, date_creation, 'en_attente'),
+        )
+        return cursor.lastrowid
 
 
 def creer_bon_mise_a_jour(

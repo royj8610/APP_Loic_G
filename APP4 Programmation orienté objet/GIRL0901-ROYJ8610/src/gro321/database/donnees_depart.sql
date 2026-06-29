@@ -54,7 +54,7 @@ INSERT INTO bons_travail (numero_serie, type_bon, date_creation, statut, composa
 
 INSERT INTO pieces (piece_id, nom) VALUES
     (1, 'Moteur NEMA-17'),
-    (2, 'Courroie'),
+    (2, 'Courroie');
 
 INSERT INTO liste_pieces (bon_id, piece_id, quantite) VALUES
     (4, 1, 1),  -- Bon de réparation pour SN-2024-006 utilise 1 Moteur NEMA-17
